@@ -18,9 +18,6 @@ let listen_sock host port =
 
 let int_of_file_descr : Unix.file_descr -> int = Obj.magic (* FIXME *)
 
-let add_client fd _out_chan =
-  eprintf "srv : adding fd %d\n%!" (int_of_file_descr fd)
-
 let rm_client ex fd =
   match ex with
   | Unix_error (unix_err, _syscall, _where) ->
@@ -32,7 +29,25 @@ let rm_client ex fd =
       Lwt.return_none
   | _ -> raise ex
 
+let client_out_channels = ref []
+
+let add_ch fd =
+  let out_chan = Unix.out_channel_of_descr fd in
+  let () = eprintf "srv : adding fd %d\n%!" (int_of_file_descr fd) in
+  client_out_channels := out_chan :: !client_out_channels
+
+let p_stdin () = Lwt_io.read_line (Lwt_io.of_unix_fd ~mode:Lwt_io.Input stdin)
+
+let rec cb_stdin line =
+  let write chan =
+    try (fprintf chan "%s\n%!" line; Some chan)
+    with _ex -> (Unix.close (descr_of_out_channel chan); None) in
+  client_out_channels := List.filter_map write !client_out_channels;
+  Lwt.bind (p_stdin ()) cb_stdin
+
 let p_accept lsocket = Lwt_unix.accept (Lwt_unix.of_unix_file_descr lsocket)
+
+let () = Sys.set_signal Sys.sigpipe (Sys.Signal_ignore)
 
 let start host port =
   let lsocket = listen_sock host port in
@@ -43,14 +58,9 @@ let start host port =
       | ADDR_INET (ip, p) -> string_of_inet_addr ip ^ ":" ^ string_of_int p
       | ADDR_UNIX s -> s
     in
-    let _ =
-      log
-        (sprintf "client restarted, accepted from %s as fd %d" msg
-           (int_of_file_descr unix_fd))
-    in
+    let _ = log (sprintf "%s spawned." msg) in
     let in_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.Input unix_fd in
-    let out_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.Output unix_fd in
-    let () = add_client unix_fd out_chan in
+    let () = add_ch unix_fd in
     let p_read () = Lwt_io.read_line in_chan in
     let rec cb_read line =
       let _ = log line in
@@ -59,4 +69,5 @@ let start host port =
     let _ = Lwt.try_bind p_read cb_read (fun ex -> rm_client ex unix_fd) in
     Lwt.bind (p_accept lsocket) cb_accept
   in
+  let _ = Lwt.bind (p_stdin ()) cb_stdin in
   Lwt.bind (p_accept lsocket) cb_accept
