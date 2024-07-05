@@ -1,13 +1,13 @@
-open Printf
 open Unix
 
 let host = Sys.argv.(1)
 let port = Sys.argv.(2) |> int_of_string
-let keepalive_interval_from = 1. (* FIXME *)
-let keepalive_interval_to = 10.
-let kill_interval_from = 5.
-let kill_interval_to = 15.
-let () = Random.init (Unix.getpid ())
+let keepalive_interval_from = 5.
+let keepalive_interval_to = 20.
+let kill_interval_from = 60.
+let kill_interval_to = 120.
+
+let () = Random.init (getpid ())
 let float_in_range min max = Random.float (max -. min) +. min
 
 let keepalive_interval () =
@@ -19,12 +19,6 @@ let mk_socket host port =
   let ip_addr = (gethostbyname host).h_addr_list.(0) in
   let sock_addr = ADDR_INET (ip_addr, port) in
   let sock = socket PF_INET SOCK_STREAM 0 in
-  let () =
-    (* FIXME : remove debug*)
-    eprintf "c   : pid %d connecting to %s:%d\n%!" (Unix.getpid ())
-      (string_of_inet_addr ip_addr)
-      port
-  in
   let () = connect sock sock_addr in
   sock
 
@@ -34,14 +28,14 @@ let client_id socket =
     | ADDR_INET (ip, p) -> string_of_inet_addr ip ^ ":" ^ string_of_int p
     | ADDR_UNIX s -> s
   in
-  addr ^ " pid " ^ string_of_int (Unix.getpid ())
+  addr ^ " pid " ^ string_of_int (getpid ())
 
 let p_kill () = Lwt_unix.sleep (kill_interval ())
 let cb_kill () = exit 0
 
 let run host port =
-  let () = Unix.close stdin in
-  (*TODO Unix.close stdout*)
+  let () = close stdin in
+  let () = close stdout in
   let socket = mk_socket host port in
   let in_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.Input socket in
   let out_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.Output socket in

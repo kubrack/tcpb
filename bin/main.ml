@@ -1,5 +1,3 @@
-open Printf
-
 let host = "127.0.0.1"
 let port = 54321
 let pcount = Sys.argv.(1) |> int_of_string
@@ -11,7 +9,7 @@ let client_exe =
 let spawn () =
   match Unix.fork () with
   | 0 -> Unix.execv client_exe [| client_exe; host; string_of_int port |]
-  | pid -> eprintf "main: spawned pid %d\n%!" pid
+  | _pid -> ()
 
 let rec spawn_all pcount =
   match pcount with
@@ -20,9 +18,7 @@ let rec spawn_all pcount =
       let () = spawn () in
       spawn_all (c - 1)
 
-let rec cb_wait (pid, _status) =
-  let () = eprintf "main: died pid %i to respawn\n%!" pid in
-  (* TODO to log *)
+let rec cb_wait (_pid, _status) =
   let () = spawn () in
   Lwt.bind (Lwt_unix.wait ()) cb_wait
 

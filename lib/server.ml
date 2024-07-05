@@ -1,7 +1,7 @@
 open Unix
 open Printf
 
-let backlog = 10
+let backlog = 64
 let log_ch = open_out "log"
 let log line = fprintf log_ch "%s\n%!" line
 
@@ -11,20 +11,11 @@ let listen_sock host port =
   let listen_sock = socket PF_INET SOCK_STREAM 0 in
   let () = bind listen_sock sock_addr in
   let () = listen listen_sock backlog in
-  let () =
-    eprintf "srv : listening at %s:%d\n%!" (string_of_inet_addr ip_addr) port
-  in
   listen_sock
-
-let int_of_file_descr : Unix.file_descr -> int = Obj.magic (* FIXME *)
 
 let rm_client ex fd =
   match ex with
-  | Unix_error (unix_err, _syscall, _where) ->
-      let () =
-        eprintf "srv : closing %d: %s\n%!" (int_of_file_descr fd)
-          (error_message unix_err)
-      in
+  | Unix_error (_unix_err, _syscall, _where) ->
       let () = close fd in
       Lwt.return_none
   | _ -> raise ex
@@ -32,8 +23,7 @@ let rm_client ex fd =
 let client_out_channels = ref []
 
 let add_ch fd =
-  let out_chan = Unix.out_channel_of_descr fd in
-  let () = eprintf "srv : adding fd %d\n%!" (int_of_file_descr fd) in
+  let out_chan = out_channel_of_descr fd in
   client_out_channels := out_chan :: !client_out_channels
 
 let p_stdin () = Lwt_io.read_line (Lwt_io.of_unix_fd ~mode:Lwt_io.Input stdin)
@@ -41,7 +31,7 @@ let p_stdin () = Lwt_io.read_line (Lwt_io.of_unix_fd ~mode:Lwt_io.Input stdin)
 let rec cb_stdin line =
   let write chan =
     try (fprintf chan "%s\n%!" line; Some chan)
-    with _ex -> (Unix.close (descr_of_out_channel chan); None) in
+    with _ex -> (close (descr_of_out_channel chan); None) in
   client_out_channels := List.filter_map write !client_out_channels;
   Lwt.bind (p_stdin ()) cb_stdin
 
