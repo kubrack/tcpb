@@ -1,0 +1,8 @@
+(executable
+ (public_name tcpb)
+ (name main)
+ (libraries tcpb lwt lwt.unix))
+(executable
+ (public_name client)
+ (name client)
+ (libraries tcpb lwt lwt.unix))
