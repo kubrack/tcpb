@@ -3,6 +3,6 @@
  (name main)
  (libraries tcpb lwt lwt.unix))
 (executable
- (public_name client)
+ (public_name client.exe)
  (name client)
  (libraries tcpb lwt lwt.unix))

@@ -4,7 +4,7 @@ let pcount = Sys.argv.(1) |> int_of_string
 
 let client_exe =
   let dir = Filename.dirname Sys.executable_name in
-  Filename.concat dir "client"
+  Filename.concat dir "client.exe"
 
 let spawn () =
   match Unix.fork () with
